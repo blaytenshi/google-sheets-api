@@ -99,4 +99,109 @@ function buildHeaderRowRequest(sheetId) {
     }
 }
 
+SheetsHelper.prototype.sync = function(spreadsheetId, sheetId, orders, callback) {
+    var requests = [];
+    // resize the sheet.
+    requests.push({
+        updateSheetProperties: {
+            properties: {
+                sheetId: sheetId,
+                gridProperties: {
+                    rowCount: orders.length + 1,
+                    columnCount: COLUMNS.length
+                }
+            },
+            fields: 'gridProperties(rowCount,columnCount)'
+        }
+    });
+    // set the cell values.
+    requests.push({
+        updateCells: {
+            start: {
+                sheetId: sheetId,
+                rowIndex: 1,
+                columnIndex: 0
+            },
+            rows: buildRowsForOrders(orders),
+            fields: '*'
+        }
+    });
+    // build and send the batchUpdate request.
+    var request = {
+        spreadsheetId: spreadsheetId,
+        resource: {
+            requests: requests
+        }
+    };
+    this.service.spreadsheets.batchUpdate(request, function(error) {
+        if (error) {
+            return callback(error);
+        }
+        return callback();
+    });
+};
+
+function buildRowsForOrders(orders) {
+    return orders.map(function(order) {
+        var cells = COLUMNS.map(function(column) {
+            switch (column.field) {
+                case 'unitsOrdered':
+                    return {
+                        userEnteredValue: {
+                            numberValue: order.unitsOrdered
+                        },
+                        userEnteredFormat: {
+                            numberFormat: {
+                                type: 'NUMBER',
+                                pattern: '#, ##0'
+                            }
+                        }
+                    };
+                    break;
+                case 'unitPrice':
+                    return {
+                        userEnteredValue: {
+                            numberValue: order.unitPrice
+                        },
+                        userEnteredFormat: {
+                            numberFormat: {
+                                type: 'CURRENCY',
+                                pattern: '"$"#,##0.00'
+                            }
+                        }
+                    };
+                    break;
+                case 'status':
+                    return {
+                        userEnteredValue: {
+                            stringValue: order.status
+                        },
+                        dataValidation: {
+                            condition: {
+                                type: 'ONE_OF_LIST',
+                                values: [
+                                    { userEnteredValue: 'PENDING' },
+                                    { userEnteredValue: 'SHIPPED' },
+                                    { userEnteredValue: 'DELIVERED' }
+                                ]
+                            },
+                            strict: true,
+                            showCustomUi: true
+                        }
+                    };
+                    break;
+                default:
+                    return {
+                        userEnteredValue: {
+                            stringValue: order[column.field].toString()
+                        }
+                    };
+            }
+        });
+        return {
+            values: cells
+        };
+    });
+}
+
 module.exports = SheetsHelper;

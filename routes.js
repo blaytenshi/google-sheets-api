@@ -105,6 +105,28 @@ router.post('/spreadsheets', function(req, res, next) {
 });
 
 // TODO: Add route for syncing spreadsheet.
-
+router.post('/spreadsheets/:id/sync', function(req, res, next) {
+    var auth = req.get('Authorization');
+    if (!auth) {
+        return next(Error('Authorization required.'));
+    }
+    var accessToken = auth.split(' ')[1];
+    var helper = new SheetsHelper(accessToken);
+    Sequelize.Promise.all([
+        models.Spreadsheet.findById(req.params.id),
+        models.Order.findAll()
+    ]).then(function(results) {
+        console.log("SPREADSHEET: ", results[0]);
+        var spreadsheet = results[0];
+        console.log("ORDERS: ", results[1]);
+        var orders = results[1];
+        helper.sync(spreadsheet.id, spreadsheet.sheetId, orders, function(error) {
+            if (error)  {
+                return next(error);
+            }
+            return res.json(orders.length);
+        });
+    });
+});
 
 module.exports = router;
