@@ -30,7 +30,14 @@ SheetsHelper.prototype.createSpreadsheet = function(title, callback) {
                         }
                     }
                 },
-                // TODO: Add more sheets.
+                {
+                    properties: {
+                        title: 'Pivot',
+                        gridProperties: {
+                            hideGridlines: true
+                        }
+                    }
+                }
             ]
         }
     };
@@ -44,7 +51,14 @@ SheetsHelper.prototype.createSpreadsheet = function(title, callback) {
         var requests = [
             buildHeaderRowRequest(dataSheetId)
         ];
-        // TODO: Add pivot table and chart.
+
+        var pivotSheetId = spreadsheet.sheets[1].properties.sheetId;
+        requests = requests.concat([
+            buildPivotTableRequest(dataSheetId, pivotSheetId),
+            buildFormatPivotTableRequest(pivotSheetId),
+            buildAddChartRequest(pivotSheetId)
+        ]);
+
         var request = {
             spreadsheetId: spreadsheet.spreadsheetId,
             resource: {
@@ -97,6 +111,119 @@ function buildHeaderRowRequest(sheetId) {
             fields: 'userEnteredValue,userEnteredFormat.textFormat.bold'
         }
     }
+}
+
+function buildPivotTableRequest(sourceSheetId, targetSheetId) {
+    return {
+        updateCells: {
+            start: { sheetId: targetSheetId, rowIndex: 0, columnIndex: 0 },
+            rows: [
+                {
+                    values: [
+                        {
+                            pivotTable: {
+                                source: {
+                                    sheetId: sourceSheetId,
+                                    startRowIndex: 0,
+                                    startColumnIndex: 0,
+                                    endColumnIndex: COLUMNS.length
+                                },
+                                rows: [
+                                    {
+                                        sourceColumnOffset: getColumnForField('productCode').index,
+                                        showTotals: false,
+                                        sortOrder: 'ASCENDING'
+                                    }
+                                ],
+                                values: [
+                                    {
+                                        summarizeFunction: 'SUM',
+                                        sourceColumnOffset: getColumnForField('unitsOrdered').index
+                                    },
+                                    {
+                                        summarizeFunction: 'SUM',
+                                        name: 'Revenue',
+                                        formula: util.format("='%s' * '%s'",
+                                            getColumnForField('unitsOrdered').header,
+                                            getColumnForField('unitPrice').header)
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ],
+            fields: '*'
+        }
+    }
+}
+
+function buildFormatPivotTableRequest(sheetId) {
+    return {
+        repeatCell: {
+            range: { sheetId: sheetId, startRowIndex: 1, startColumnIndex: 2 },
+            cell: {
+                userEnteredFormat: {
+                    numberFormat: { type: 'CURRENCY', pattern: '"$"#,##0.00' }
+                }
+            },
+            fields: 'userEnteredFormat.numberFormat'
+        }
+    };
+}
+
+function buildAddChartRequest(sheetId) {
+    return {
+        addChart: {
+            chart: {
+                spec: {
+                    title: 'Revenue per Product',
+                    basicChart: {
+                        chartType: 'BAR',
+                        legendPosition: 'RIGHT_LEGEND',
+                        domains: [
+                            // show a bar for each product code in the pivot table.
+                            {
+                                domain: { sourceRange: { sources: [{
+                                    sheetId: sheetId,
+                                    startRowIndex: 0,
+                                    startColumnIndex: 0,
+                                    endColumnIndex: 1
+                                }]}}
+                            }
+                        ],
+                        series: [
+                            {
+                                series: { sourceRange: { sources: [{
+                                    sheetId: sheetId,
+                                    startRowIndex: 0,
+                                    startColumnIndex: 2,
+                                    endColumnIndex: 3
+                                }]}}
+                            }
+                        ]
+                    }
+                },
+                position: {
+                    overlayPosition: {
+                        anchorCell: { sheetId: sheetId, rowIndex: 0, columnIndex: 3 },
+                        widthPixels: 600,
+                        heightPixels: 400
+                    }
+                }
+            }
+        }
+    };
+}
+
+function getColumnForField(field) {
+    return COLUMNS.reduce(function(result, column, i) {
+        if (column.field == field) {
+            column.index = i;
+            return column;
+        }
+        return result;
+    });
 }
 
 SheetsHelper.prototype.sync = function(spreadsheetId, sheetId, orders, callback) {
