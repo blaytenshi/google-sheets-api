@@ -40,8 +40,34 @@ SheetsHelper.prototype.createSpreadsheet = function(title, callback) {
         }
         var spreadsheet = response.data;
         // TODO: Add header rows.
-        return callback(null, spreadsheet);
+        var dataSheetId = spreadsheet.sheets[0].properties.sheetId;
+        var requests = [
+            buildHeaderRowRequest(dataSheetId)
+        ];
+        // TODO: Add pivot table and chart.
+        var request = {
+            spreadsheetId: spreadsheet.spreadsheetId,
+            resource: {
+                requests: requests
+            }
+        };
+        self.service.spreadsheets.batchUpdate(request, function(error, response) {
+            if (error) {
+                return callback(error);
+            }
+            return callback(null, spreadsheet);
+        });
     });
 };
+
+var COLUMNS = [
+    { field: 'id', header: 'ID' },
+    { field: 'customerName', header: 'Customer Name' },
+    { field: 'productCode', header: 'Product Code' },
+    { field: 'unitsOrdered', header: 'Units Ordered' },
+    { field: 'unitPrice', header: 'Unit Price' },
+    { field: 'status', header: 'Status' },
+
+]
 
 module.exports = SheetsHelper;
