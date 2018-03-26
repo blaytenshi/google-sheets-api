@@ -66,8 +66,37 @@ var COLUMNS = [
     { field: 'productCode', header: 'Product Code' },
     { field: 'unitsOrdered', header: 'Units Ordered' },
     { field: 'unitPrice', header: 'Unit Price' },
-    { field: 'status', header: 'Status' },
+    { field: 'status', header: 'Status' }
+];
 
-]
+function buildHeaderRowRequest(sheetId) {
+    var cells = COLUMNS.map(function(column) {
+        return {
+            userEnteredValue: {
+                stringValue: column.header
+            },
+            userEnteredFormat: {
+                textFormat: {
+                    bold: true
+                }
+            }
+        }
+    });
+    return {
+        updateCells: {
+            start: {
+                sheetId: sheetId,
+                rowIndex: 0,
+                columnIndex: 0
+            },
+            rows: [
+                {
+                    values: cells
+                }
+            ],
+            fields: 'userEnteredValue,userEnteredFormat.textFormat.bold'
+        }
+    }
+}
 
 module.exports = SheetsHelper;
